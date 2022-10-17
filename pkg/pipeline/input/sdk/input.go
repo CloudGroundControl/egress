@@ -125,6 +125,7 @@ func (s *SDKInput) SendEOS() {
 		go func() {
 			defer wg.Done()
 			s.audioWriter.sendEOS()
+			s.logger.Debugw("audio writer finished")
 		}()
 	}
 	if s.videoWriter != nil {
@@ -132,9 +133,24 @@ func (s *SDKInput) SendEOS() {
 		go func() {
 			defer wg.Done()
 			s.videoWriter.sendEOS()
+			s.logger.Debugw("video writer finished")
 		}()
 	}
 	wg.Wait()
+}
+
+func (s *SDKInput) SendAppSrcEOS(name string) {
+	if name == AudioAppSource {
+		s.audioWriter.sendEOS()
+		if s.active.Dec() == 0 {
+			s.onDisconnected()
+		}
+	} else if name == VideoAppSource {
+		s.videoWriter.sendEOS()
+		if s.active.Dec() == 0 {
+			s.onDisconnected()
+		}
+	}
 }
 
 func (s *SDKInput) Close() {

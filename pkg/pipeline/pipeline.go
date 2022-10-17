@@ -36,11 +36,15 @@ const (
 	fragmentRunningTime   = "running-time"
 
 	elementGstRtmp2Sink = "GstRtmp2Sink"
+<<<<<<< HEAD
 	elementGstGstAppSrc = "GstAppSrc"
 	elementGstWebMMux   = "GstWebMMux"
 
 	messageCapsChanges   = "Caps changes are not supported"
 	messageStreamingStop = "streaming stopped"
+=======
+	elementGstAppSrc    = "GstAppSrc"
+>>>>>>> 914f9b8038bae81cfe60ecc05bc5e053e5862248
 )
 
 type Pipeline struct {
@@ -53,13 +57,12 @@ type Pipeline struct {
 	loop     *glib.MainLoop
 
 	// internal
-	mu            sync.Mutex
-	playing       bool
-	fileStartedAt int64
-	limitTimer    *time.Timer
-	closed        chan struct{}
-	closeOnce     sync.Once
-	eosTimer      *time.Timer
+	mu         sync.Mutex
+	playing    bool
+	limitTimer *time.Timer
+	closed     chan struct{}
+	closeOnce  sync.Once
+	eosTimer   *time.Timer
 
 	// segments
 	playlistWriter *sink.PlaylistWriter
@@ -505,8 +508,11 @@ func (p *Pipeline) updateStartTime(startedAt int64) {
 		}
 		p.mu.Unlock()
 
-	case params.EgressTypeFile, params.EgressTypeSegmentedFile:
-		p.fileStartedAt = startedAt
+	case params.EgressTypeFile:
+		p.FileInfo.StartedAt = startedAt
+
+	case params.EgressTypeSegmentedFile:
+		p.SegmentsInfo.StartedAt = startedAt
 	}
 
 	p.Info.Status = livekit.EgressStatus_EGRESS_ACTIVE
@@ -574,16 +580,18 @@ func (p *Pipeline) updateDuration(endedAt int64) {
 		}
 
 	case params.EgressTypeFile:
-		if p.fileStartedAt == 0 {
-			p.fileStartedAt = endedAt
+		if p.FileInfo.StartedAt == 0 {
+			p.FileInfo.StartedAt = endedAt
 		}
-		p.FileInfo.Duration = endedAt - p.fileStartedAt
+		p.FileInfo.EndedAt = endedAt
+		p.FileInfo.Duration = endedAt - p.FileInfo.StartedAt
 
 	case params.EgressTypeSegmentedFile:
-		if p.fileStartedAt == 0 {
-			p.fileStartedAt = endedAt
+		if p.SegmentsInfo.StartedAt == 0 {
+			p.SegmentsInfo.StartedAt = endedAt
 		}
-		p.SegmentsInfo.Duration = endedAt - p.fileStartedAt
+		p.SegmentsInfo.EndedAt = endedAt
+		p.SegmentsInfo.Duration = endedAt - p.SegmentsInfo.StartedAt
 	}
 }
 
@@ -719,7 +727,7 @@ func getSegmentParamsFromGstStructure(s *gst.Structure) (filepath string, time i
 
 // handleError returns true if the error has been handled, false if the pipeline should quit
 func (p *Pipeline) handleError(gErr *gst.GError) (error, bool) {
-	element, name, _ := parseDebugInfo(gErr)
+	element, name, message := parseDebugInfo(gErr)
 	err := errors.New(gErr.Error())
 
 	switch {
@@ -734,6 +742,7 @@ func (p *Pipeline) handleError(gErr *gst.GError) (error, bool) {
 			return err, false
 		}
 		return err, true
+<<<<<<< HEAD
 	case element == elementGstGstAppSrc:
 		// keep publish segment file if the source stream terminate by network issue or participant leave the room before egress stop
 		if strings.Contains(gErr.DebugString(), messageStreamingStop) {
@@ -758,7 +767,25 @@ func (p *Pipeline) handleError(gErr *gst.GError) (error, bool) {
 			"message", gErr.Message(),
 		)
 		return err, false
+=======
+
+	case element == elementGstAppSrc:
+		if message == "streaming stopped, reason not-negotiated (-4)" {
+			// send eos to app src
+			p.Logger.Debugw("streaming stopped", "name", name)
+			p.in.(*sdk.SDKInput).SendAppSrcEOS(name)
+			return err, true
+		}
+>>>>>>> 914f9b8038bae81cfe60ecc05bc5e053e5862248
 	}
+
+	// input failure or file write failure. Fatal
+	p.Logger.Errorw("pipeline error", err,
+		"element", element,
+		"message", message,
+	)
+
+	return err, false
 }
 
 // Debug info comes in the following format:
