@@ -36,15 +36,10 @@ const (
 	fragmentRunningTime   = "running-time"
 
 	elementGstRtmp2Sink = "GstRtmp2Sink"
-<<<<<<< HEAD
-	elementGstGstAppSrc = "GstAppSrc"
+	elementGstAppSrc    = "GstAppSrc"
 	elementGstWebMMux   = "GstWebMMux"
 
-	messageCapsChanges   = "Caps changes are not supported"
-	messageStreamingStop = "streaming stopped"
-=======
-	elementGstAppSrc    = "GstAppSrc"
->>>>>>> 914f9b8038bae81cfe60ecc05bc5e053e5862248
+	messageCapsChanges = "Caps changes are not supported"
 )
 
 type Pipeline struct {
@@ -289,10 +284,6 @@ func (p *Pipeline) messageWatch(msg *gst.Message) bool {
 		}
 
 		p.Logger.Debugw("EOS received, stopping pipeline")
-		if p.Info.Status == livekit.EgressStatus_EGRESS_ACTIVE {
-			p.Info.Status = livekit.EgressStatus_EGRESS_ENDING
-		}
-
 		p.stop()
 		return false
 
@@ -746,12 +737,11 @@ func (p *Pipeline) handleError(gErr *gst.GError) (error, bool) {
 			return err, false
 		}
 		return err, true
-<<<<<<< HEAD
-	case element == elementGstGstAppSrc:
-		// keep publish segment file if the source stream terminate by network issue or participant leave the room before egress stop
-		if strings.Contains(gErr.DebugString(), messageStreamingStop) {
-			p.Logger.Warnw("Source stream stopped", err)
-			p.SendEOS(context.Background())
+	case element == elementGstAppSrc:
+		if message == "streaming stopped, reason not-negotiated (-4)" {
+			// send eos to app src
+			p.Logger.Debugw("streaming stopped", "name", name)
+			p.in.(*sdk.SDKInput).SendAppSrcEOS(name)
 			return err, true
 		}
 		return err, false
@@ -771,16 +761,6 @@ func (p *Pipeline) handleError(gErr *gst.GError) (error, bool) {
 			"message", gErr.Message(),
 		)
 		return err, false
-=======
-
-	case element == elementGstAppSrc:
-		if message == "streaming stopped, reason not-negotiated (-4)" {
-			// send eos to app src
-			p.Logger.Debugw("streaming stopped", "name", name)
-			p.in.(*sdk.SDKInput).SendAppSrcEOS(name)
-			return err, true
-		}
->>>>>>> 914f9b8038bae81cfe60ecc05bc5e053e5862248
 	}
 
 	// input failure or file write failure. Fatal
